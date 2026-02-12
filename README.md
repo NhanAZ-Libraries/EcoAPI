@@ -492,31 +492,6 @@ To use it:
 
 ---
 
-## Project Structure
-
-```
-EcoAPI/
-├── src/NhanAZ/EcoAPI/
-│   ├── EcoAPI.php                  # Main entry point (static methods)
-│   ├── EconomyProvider.php         # Interface for all providers
-│   ├── exception/
-│   │   ├── UnknownProviderException.php
-│   │   └── MissingProviderDependencyException.php
-│   └── provider/
-│       ├── EconomyAPIProvider.php   # onebone/EconomyAPI
-│       ├── BedrockEconomyProvider.php # cooldogedev/BedrockEconomy
-│       ├── SimpleEconomyProvider.php  # NhanAZ/SimpleEconomy
-│       └── XPProvider.php           # Built-in XP levels
-├── example/                        # Example plugin
-│   ├── plugin.yml
-│   └── src/NhanAZ/EcoAPIExample/Main.php
-├── virion.yml                      # Virion configuration
-├── composer.json                   # Composer configuration
-├── .poggit.yml                     # Poggit CI configuration
-├── LICENSE                         # Apache License 2.0
-└── README.md                       # This file
-```
-
 ## License
 
 This project is licensed under the **Apache License 2.0** — see the [LICENSE](LICENSE) file for details.
