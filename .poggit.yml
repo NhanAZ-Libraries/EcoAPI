@@ -1,0 +1,15 @@
+--- # Poggit-CI Manifest. Open the CI at https://poggit.pmmp.io/ci/NhanAZ/EcoAPI
+build-by-default: true
+branches:
+  - main
+projects:
+  EcoAPI:
+    type: library
+    model: virion
+  EcoAPIPlugin: []
+  EcoAPIExample:
+    path: example
+    libs:
+      - src: NhanAZ/EcoAPI/EcoAPI
+        version: ^1.0.0
+...

@@ -1,0 +1,17 @@
+name: EcoAPIExample
+version: 1.0.0
+main: NhanAZ\EcoAPIExample\Main
+api: 5.0.0
+description: Simple example plugin demonstrating EcoAPI usage
+author: NhanAZ
+
+commands:
+  balance:
+    description: Check your balance
+    usage: /balance
+    permission: ecoapiexample.balance
+
+permissions:
+  ecoapiexample.balance:
+    default: true
+    description: Allows checking your balance
