@@ -13,6 +13,7 @@ namespace NhanAZ\EcoAPI\provider;
 
 use Closure;
 use NhanAZ\EcoAPI\EconomyProvider;
+use NhanAZ\EcoAPI\exception\MissingProviderDependencyException;
 use NhanAZ\SimpleEconomy\Main as SimpleEconomy;
 use pocketmine\player\Player;
 use pocketmine\Server;
@@ -28,7 +29,9 @@ class SimpleEconomyProvider implements EconomyProvider {
 
 	public function __construct() {
 		$plugin = SimpleEconomy::getInstance();
-		assert($plugin !== null);
+		if ($plugin === null || !$plugin->isEnabled()) {
+			throw new MissingProviderDependencyException("SimpleEconomy is not enabled");
+		}
 		$this->plugin = $plugin;
 	}
 
@@ -41,7 +44,8 @@ class SimpleEconomyProvider implements EconomyProvider {
 	}
 
 	public static function isAvailable(): bool {
-		return Server::getInstance()->getPluginManager()->getPlugin("SimpleEconomy") !== null;
+		$plugin = Server::getInstance()->getPluginManager()->getPlugin("SimpleEconomy");
+		return $plugin instanceof SimpleEconomy && $plugin->isEnabled() && SimpleEconomy::getInstance() === $plugin;
 	}
 
 	public function getMoney(Player $player, Closure $callback): void {

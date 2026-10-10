@@ -39,7 +39,8 @@ class EconomyAPIProvider implements EconomyProvider {
 	}
 
 	public static function isAvailable(): bool {
-		return Server::getInstance()->getPluginManager()->getPlugin("EconomyAPI") !== null;
+		$plugin = Server::getInstance()->getPluginManager()->getPlugin("EconomyAPI");
+		return $plugin !== null && $plugin->isEnabled();
 	}
 
 	public function getMoney(Player $player, Closure $callback): void {

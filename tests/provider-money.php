@@ -3,6 +3,37 @@
 declare(strict_types=1);
 
 namespace EcoAPITest {
+	final class PluginDescription {
+		public function __construct(private string $version) {
+		}
+
+		public function getVersion(): string {
+			return $this->version;
+		}
+	}
+
+	final class Plugin {
+		public function __construct(public bool $enabled = false, public string $version = "4.0.0") {
+		}
+
+		public function isEnabled(): bool {
+			return $this->enabled;
+		}
+
+		public function getDescription(): PluginDescription {
+			return new PluginDescription($this->version);
+		}
+	}
+
+	final class PluginManager {
+		/** @var array<string, object> */
+		public array $plugins = [];
+
+		public function getPlugin(string $name): ?object {
+			return $this->plugins[$name] ?? null;
+		}
+	}
+
 	final class ExperienceManager {
 		public bool $cancel = false;
 		public float $progress = 0.5;
@@ -33,6 +64,23 @@ namespace EcoAPITest {
 	}
 }
 
+namespace pocketmine {
+	final class Server {
+		public static ?self $instance = null;
+
+		public function __construct(private \EcoAPITest\PluginManager $manager) {
+		}
+
+		public static function getInstance(): self {
+			return self::$instance ?? throw new \RuntimeException("Test server is not initialized");
+		}
+
+		public function getPluginManager(): \EcoAPITest\PluginManager {
+			return $this->manager;
+		}
+	}
+}
+
 namespace pocketmine\player {
 	final class Player {
 		public function __construct(private \EcoAPITest\ExperienceManager $manager) {
@@ -55,6 +103,7 @@ namespace pocketmine\player {
 namespace NhanAZ\SimpleEconomy {
 	final class Main {
 		public static ?self $instance = null;
+		public bool $enabled = true;
 
 		/** @var list<array{string, string, int}> */
 		public array $calls = [];
@@ -62,6 +111,10 @@ namespace NhanAZ\SimpleEconomy {
 
 		public static function getInstance(): ?self {
 			return self::$instance;
+		}
+
+		public function isEnabled(): bool {
+			return $this->enabled;
 		}
 
 		public function setMoney(string $name, int $amount): bool {
@@ -147,6 +200,7 @@ namespace {
 	require __DIR__ . "/../src/NhanAZ/EcoAPI/EconomyProvider.php";
 	require __DIR__ . "/../src/NhanAZ/EcoAPI/provider/XPProvider.php";
 	require __DIR__ . "/../src/NhanAZ/EcoAPI/provider/BedrockEconomyProvider.php";
+	require __DIR__ . "/../src/NhanAZ/EcoAPI/provider/EconomyAPIProvider.php";
 	require __DIR__ . "/../src/NhanAZ/EcoAPI/provider/SimpleEconomyProvider.php";
 	require __DIR__ . "/../src/NhanAZ/EcoAPI/exception/MissingProviderDependencyException.php";
 	require __DIR__ . "/../src/NhanAZ/EcoAPI/exception/UnknownProviderException.php";
@@ -157,12 +211,16 @@ namespace {
 	use cooldogedev\BedrockEconomy\database\cache\CacheEntry;
 	use cooldogedev\BedrockEconomy\database\cache\GlobalCache;
 	use EcoAPITest\ExperienceManager;
+	use EcoAPITest\Plugin;
+	use EcoAPITest\PluginManager;
 	use NhanAZ\EcoAPI\EcoAPI;
 	use NhanAZ\EcoAPI\provider\BedrockEconomyProvider;
+	use NhanAZ\EcoAPI\provider\EconomyAPIProvider;
 	use NhanAZ\EcoAPI\provider\SimpleEconomyProvider;
 	use NhanAZ\EcoAPI\provider\XPProvider;
 	use NhanAZ\SimpleEconomy\Main as SimpleEconomy;
 	use pocketmine\player\Player;
+	use pocketmine\Server;
 
 	function expect(bool $condition, string $message): void {
 		if (!$condition) {
@@ -260,6 +318,34 @@ namespace {
 	$simpleProvider->takeMoney($player, 2.0, static function (bool $result) use (&$success): void { $success = $result; });
 	expect($success === false && $simpleEconomy->calls[2] === ["reduce", "Tester", 2], "SimpleEconomy rejection must reach the callback");
 
+	$pluginRegistry = new PluginManager();
+	Server::$instance = new Server($pluginRegistry);
+	$economyPlugin = new Plugin(false);
+	$pluginRegistry->plugins["EconomyAPI"] = $economyPlugin;
+	expect(!EconomyAPIProvider::isAvailable(), "Loaded but disabled EconomyAPI must not be selected");
+	$economyPlugin->enabled = true;
+	expect(EconomyAPIProvider::isAvailable(), "Enabled EconomyAPI must be selectable");
+	$bedrockPlugin = new Plugin(false, "4.0.0");
+	$pluginRegistry->plugins["BedrockEconomy"] = $bedrockPlugin;
+	expect(!BedrockEconomyProvider::isAvailable(), "Loaded but disabled BedrockEconomy must not be selected");
+	$bedrockPlugin->enabled = true;
+	expect(BedrockEconomyProvider::isAvailable(), "Enabled compatible BedrockEconomy must be selectable");
+	$bedrockPlugin->version = "3.9.9";
+	expect(!BedrockEconomyProvider::isAvailable(), "Unsupported BedrockEconomy must not be selected");
+	$pluginRegistry->plugins["SimpleEconomy"] = $simpleEconomy;
+	SimpleEconomy::$instance = null;
+	expect(!SimpleEconomyProvider::isAvailable(), "Loaded SimpleEconomy without an initialized singleton must not be selected");
+	try {
+		new SimpleEconomyProvider();
+		throw new RuntimeException("Uninitialized SimpleEconomy provider was constructed");
+	} catch (\NhanAZ\EcoAPI\exception\MissingProviderDependencyException) {
+	}
+	SimpleEconomy::$instance = $simpleEconomy;
+	$simpleEconomy->enabled = false;
+	expect(!SimpleEconomyProvider::isAvailable(), "Disabled SimpleEconomy must not be selected");
+	$simpleEconomy->enabled = true;
+	expect(SimpleEconomyProvider::isAvailable(), "Enabled initialized SimpleEconomy must be selectable");
+
 	EcoAPI::registerProvider(static fn(): XPProvider => new XPProvider(), static fn(): bool => true, "testxp", "xp-alias");
 	expect(EcoAPI::getProvider("XP-ALIAS") instanceof XPProvider, "Provider alias must resolve without dynamic class construction");
 	expect(EcoAPI::detectProvider() instanceof XPProvider, "Available custom provider must be detected");
@@ -280,5 +366,5 @@ namespace {
 	}
 	expect(!$unavailableFactoryCalled, "Unavailable provider factory must not run");
 
-	echo "PASS: XP, SimpleEconomy and Bedrock amount guards, provider factory, aliases and availability\n";
+	echo "PASS: XP, SimpleEconomy and Bedrock amount guards, provider factory, aliases and enabled-state availability\n";
 }

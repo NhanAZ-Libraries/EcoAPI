@@ -4,6 +4,7 @@ main: NhanAZ\EcoAPIExample\Main
 api: 5.0.0
 description: Simple example plugin demonstrating EcoAPI usage
 author: NhanAZ
+softdepend: [EconomyAPI, BedrockEconomy, SimpleEconomy]
 
 commands:
   balance:

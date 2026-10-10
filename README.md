@@ -15,6 +15,8 @@ EcoAPI gives PocketMine-MP plugins one callback based interface for several econ
 
 EcoAPI checks availability when a provider is selected. Provider specific money operations have different storage and callback behavior. Test the selected provider with disposable balances before using it on a live server.
 
+An optional provider is available only after its plugin is enabled. A consumer that selects a provider in `onEnable()` should declare the desired plugin names under `softdepend` so they enable first. The example does this for EconomyAPI, BedrockEconomy and SimpleEconomy; when none is ready, it uses built-in XP.
+
 SimpleEconomy stores whole units. Its adapter rejects fractional, non-finite, negative and out-of-range amounts; adding or taking money also requires an amount greater than zero. A successful callback reports that SimpleEconomy accepted the immediate in-memory change, while its SQL save continues asynchronously. Balance reads can return the configured default when a player's session has not loaded; that value is not proof of a persisted balance.
 
 The BedrockEconomy adapter accepts finite, nonnegative balances for `setMoney()` and positive amounts for `addMoney()` and `takeMoney()`. It rejects values that would change when represented to two decimal places, and accepts whole units only when the configured currency disables decimals. Rejected amounts call the supplied callback with `false` without submitting a transaction. A success callback reports the underlying BedrockEconomy operation; live provider and connected-player persistence remain unverified.
@@ -29,7 +31,7 @@ virions:
     version: ^1.0.0
 ```
 
-The [`example/`](example/) directory contains this declaration. [DevTools](https://github.com/NhanAZ/DevTools) builds the consumer PHAR and shades the EcoAPI namespace. Pin the source revision and follow the [DevTools build guide](https://github.com/NhanAZ/DevTools/blob/main/docs/github-actions.md) for reproducible builds. The repository workflow builds and validates a companion `EcoAPIPlugin` PHAR, then uploads an artifact after its checks pass. An artifact is not a stable release.
+The [`example/`](example/) directory contains this declaration. [DevTools](https://github.com/NhanAZ/DevTools) builds the consumer PHAR and shades the EcoAPI namespace. Pin the source revision and follow the [DevTools build guide](https://github.com/NhanAZ/DevTools/blob/main/docs/github-actions.md) for reproducible builds. The repository workflow builds and validates the companion `EcoAPIPlugin` and shaded example PHARs, then uploads them after its checks pass. An artifact is not a stable release.
 
 ## Basic usage
 
