@@ -144,6 +144,7 @@ jobs:
           name: EcoAPI-${{ github.sha }}
           path: |
             ${{ steps.build.outputs.phar }}
+            ${{ steps.example-build.outputs.phar }}
             build/devtools-build.json
           if-no-files-found: error
           retention-days: 14
