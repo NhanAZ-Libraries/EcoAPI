@@ -41,7 +41,7 @@ class XPProvider implements EconomyProvider {
 
 	public function setMoney(Player $player, float $amount, ?Closure $callback = null): void {
 		$success = self::isWholeAmount($amount, false)
-			&& $player->getXpManager()->setXpAndProgress((int) $amount, 0.0);
+			&& $player->getXpManager()->setXpLevel((int) $amount);
 		$callback?->__invoke($success);
 	}
 
@@ -55,7 +55,7 @@ class XPProvider implements EconomyProvider {
 		$manager = $player->getXpManager();
 		$success = self::isWholeAmount($amount, true)
 			&& $manager->getXpLevel() >= $amount
-			&& $manager->setXpAndProgress($manager->getXpLevel() - (int) $amount, 0.0);
+			&& $manager->subtractXpLevels((int) $amount);
 		$callback?->__invoke($success);
 	}
 

@@ -45,12 +45,11 @@ namespace EcoAPITest {
 			return $this->level;
 		}
 
-		public function setXpAndProgress(int $level, float $progress): bool {
+		public function setXpLevel(int $level): bool {
 			if ($this->cancel) {
 				return false;
 			}
 			$this->level = $level;
-			$this->progress = $progress;
 			return true;
 		}
 
@@ -60,6 +59,10 @@ namespace EcoAPITest {
 			}
 			$this->level += $amount;
 			return true;
+		}
+
+		public function subtractXpLevels(int $amount): bool {
+			return $this->addXpLevels(-$amount);
 		}
 	}
 }
@@ -276,17 +279,25 @@ namespace {
 	$xp->takeMoney($player, 1.5, static function (bool $result) use (&$success): void { $success = $result; });
 	expect($success === false && $manager->level === 4, "Fractional XP withdrawal must fail");
 	$xp->takeMoney($player, 2.0, static function (bool $result) use (&$success): void { $success = $result; });
-	expect($success === true && $manager->level === 2 && $manager->progress === 0.0, "Valid XP withdrawal must debit two levels");
+	expect($success === true && $manager->level === 2 && $manager->progress === 0.5, "XP withdrawal must debit two levels without clearing progress");
 	$xp->setMoney($player, -1.0, static function (bool $result) use (&$success): void { $success = $result; });
 	expect($success === false && $manager->level === 2, "Negative XP balance must fail");
 	$xp->addMoney($player, 0.5, static function (bool $result) use (&$success): void { $success = $result; });
 	expect($success === false && $manager->level === 2, "Fractional XP deposit must fail");
 	$manager->cancel = true;
+	$xp->takeMoney($player, 1.0, static function (bool $result) use (&$success): void { $success = $result; });
+	expect($success === false && $manager->level === 2 && $manager->progress === 0.5, "Cancelled XP withdrawal must preserve level and progress");
 	$xp->addMoney($player, 1.0, static function (bool $result) use (&$success): void { $success = $result; });
 	expect($success === false && $manager->level === 2, "Cancelled XP change must report failure");
 	$manager->cancel = false;
 	$xp->addMoney($player, 1.0, static function (bool $result) use (&$success): void { $success = $result; });
-	expect($success === true && $manager->level === 3, "Valid XP deposit must credit one level");
+	expect($success === true && $manager->level === 3 && $manager->progress === 0.5, "XP deposit must credit one level without clearing progress");
+	$xp->setMoney($player, 7.0, static function (bool $result) use (&$success): void { $success = $result; });
+	expect($success === true && $manager->level === 7 && $manager->progress === 0.5, "Setting XP balance must preserve progress");
+	$manager->cancel = true;
+	$xp->setMoney($player, 8.0, static function (bool $result) use (&$success): void { $success = $result; });
+	expect($success === false && $manager->level === 7 && $manager->progress === 0.5, "Cancelled XP balance change must preserve level and progress");
+	$manager->cancel = false;
 
 	$reflection = new ReflectionClass(BedrockEconomyProvider::class);
 	/** @var BedrockEconomyProvider $bedrock */

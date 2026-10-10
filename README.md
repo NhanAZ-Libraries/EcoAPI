@@ -17,6 +17,8 @@ EcoAPI checks availability when a provider is selected. Provider specific money 
 
 An optional provider is available only after its plugin is enabled. A consumer that selects a provider in `onEnable()` should declare the desired plugin names under `softdepend` so they enable first. The example does this for EconomyAPI, BedrockEconomy and SimpleEconomy; when none is ready, it uses built-in XP.
 
+The XP provider treats whole levels as currency. Setting, adding or taking levels keeps the player's progress within the current level. Its callback reports whether Axolotl-PM accepted the level change. An isolated server probe verified this behavior with a synthetic Player and the server's ExperienceManager. A connected player has not been tested.
+
 SimpleEconomy stores whole units. Its adapter rejects fractional, non-finite, negative and out-of-range amounts; adding or taking money also requires an amount greater than zero. A successful callback reports that SimpleEconomy accepted the immediate in-memory change, while its SQL save continues asynchronously. Balance reads can return the configured default when a player's session has not loaded; that value is not proof of a persisted balance.
 
 EconomyAPI rounds submitted amounts to two decimal places. Its adapter rejects non-finite, negative and subcent amounts before submission; adding or taking money also requires a positive amount. A successful callback reports the backend return code, while persistence depends on the configured EconomyAPI provider. Connected-player and persistence integration for EconomyAPI remain unverified.
