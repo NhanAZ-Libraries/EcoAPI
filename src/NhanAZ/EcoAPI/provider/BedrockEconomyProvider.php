@@ -63,12 +63,16 @@ class BedrockEconomyProvider implements EconomyProvider {
 	}
 
 	public function setMoney(Player $player, float $amount, ?Closure $callback = null): void {
-		$decimals = self::extractDecimals($amount);
+		$parts = $this->splitAmount($amount, false);
+		if ($parts === null) {
+			$callback?->__invoke(false);
+			return;
+		}
 		$this->api->set(
 			$player->getXuid(),
 			$player->getName(),
-			(int) $amount,
-			$decimals,
+			$parts[0],
+			$parts[1],
 			function () use ($callback): void {
 				if ($callback !== null) {
 					$callback(true);
@@ -83,12 +87,16 @@ class BedrockEconomyProvider implements EconomyProvider {
 	}
 
 	public function addMoney(Player $player, float $amount, ?Closure $callback = null): void {
-		$decimals = self::extractDecimals($amount);
+		$parts = $this->splitAmount($amount, true);
+		if ($parts === null) {
+			$callback?->__invoke(false);
+			return;
+		}
 		$this->api->add(
 			$player->getXuid(),
 			$player->getName(),
-			(int) $amount,
-			$decimals,
+			$parts[0],
+			$parts[1],
 			function () use ($callback): void {
 				if ($callback !== null) {
 					$callback(true);
@@ -103,12 +111,16 @@ class BedrockEconomyProvider implements EconomyProvider {
 	}
 
 	public function takeMoney(Player $player, float $amount, ?Closure $callback = null): void {
-		$decimals = self::extractDecimals($amount);
+		$parts = $this->splitAmount($amount, true);
+		if ($parts === null) {
+			$callback?->__invoke(false);
+			return;
+		}
 		$this->api->subtract(
 			$player->getXuid(),
 			$player->getName(),
-			(int) $amount,
-			$decimals,
+			$parts[0],
+			$parts[1],
 			function () use ($callback): void {
 				if ($callback !== null) {
 					$callback(true);
@@ -122,12 +134,19 @@ class BedrockEconomyProvider implements EconomyProvider {
 		);
 	}
 
-	/**
-	 * Extract the decimal part from a float amount.
-	 * e.g., 123.45 => 45, 100.0 => 0
-	 */
-	private static function extractDecimals(float $amount): int {
-		$parts = explode(".", number_format($amount, 2, ".", ""));
-		return (int) $parts[1];
+	/** @return array{int, int}|null */
+	private function splitAmount(float $amount, bool $positive): ?array {
+		if (!is_finite($amount) || ($positive ? $amount <= 0 : $amount < 0) || $amount >= PHP_INT_MAX) {
+			return null;
+		}
+		$formatted = number_format($amount, 2, ".", "");
+		if ((float) $formatted !== $amount) {
+			return null;
+		}
+		[$units, $cents] = explode(".", $formatted, 2);
+		if (!$this->currency->decimals && (int) $cents !== 0) {
+			return null;
+		}
+		return [(int) $units, (int) $cents];
 	}
 }

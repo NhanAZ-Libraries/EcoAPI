@@ -86,6 +86,7 @@ namespace cooldogedev\BedrockEconomy\currency {
 		public string $symbol = "$";
 		public int $defaultAmount = 1;
 		public int $defaultDecimals = 50;
+		public bool $decimals = true;
 	}
 }
 
@@ -116,9 +117,27 @@ namespace cooldogedev\BedrockEconomy\api\type {
 	final class ClosureAPI {
 		/** @var array{int, int}|null */
 		public ?array $lastAmount = null;
+		public ?string $lastOperation = null;
+		public int $calls = 0;
 
 		public function set(string $xuid, string $name, int $amount, int $decimals, \Closure $onSuccess, \Closure $onError): void {
+			$this->lastOperation = "set";
 			$this->lastAmount = [$amount, $decimals];
+			++$this->calls;
+			$onSuccess();
+		}
+
+		public function add(string $xuid, string $name, int $amount, int $decimals, \Closure $onSuccess, \Closure $onError): void {
+			$this->lastOperation = "add";
+			$this->lastAmount = [$amount, $decimals];
+			++$this->calls;
+			$onSuccess();
+		}
+
+		public function subtract(string $xuid, string $name, int $amount, int $decimals, \Closure $onSuccess, \Closure $onError): void {
+			$this->lastOperation = "subtract";
+			$this->lastAmount = [$amount, $decimals];
+			++$this->calls;
 			$onSuccess();
 		}
 	}
@@ -189,6 +208,33 @@ namespace {
 	expect($success === true && $api->lastAmount === [1, 50], "Bedrock 1.50 must send 50 cents to the API");
 	$bedrock->setMoney($player, 1.05, static function (bool $result) use (&$success): void { $success = $result; });
 	expect($success === true && $api->lastAmount === [1, 5], "Bedrock 1.05 must send five cents to the API");
+	foreach ([NAN, INF, -INF, -1.0, 0.001, 1.005, (float) PHP_INT_MAX] as $invalid) {
+		foreach (["setMoney", "addMoney", "takeMoney"] as $method) {
+			$before = $api->calls;
+			$success = null;
+			$bedrock->{$method}($player, $invalid, static function (bool $result) use (&$success): void { $success = $result; });
+			expect($success === false && $api->calls === $before, "Bedrock must reject lossy or invalid amounts before mutation");
+		}
+	}
+	foreach (["addMoney", "takeMoney"] as $method) {
+		$before = $api->calls;
+		$success = null;
+		$bedrock->{$method}($player, 0.0, static function (bool $result) use (&$success): void { $success = $result; });
+		expect($success === false && $api->calls === $before, "Bedrock transfer amounts must be positive");
+	}
+	$bedrock->setMoney($player, 0.0, static function (bool $result) use (&$success): void { $success = $result; });
+	expect($success === true && $api->lastOperation === "set" && $api->lastAmount === [0, 0], "Bedrock may set a zero balance");
+	$bedrock->addMoney($player, 0.01, static function (bool $result) use (&$success): void { $success = $result; });
+	expect($success === true && $api->lastOperation === "add" && $api->lastAmount === [0, 1], "Bedrock add must forward one cent");
+	$bedrock->takeMoney($player, 2.75, static function (bool $result) use (&$success): void { $success = $result; });
+	expect($success === true && $api->lastOperation === "subtract" && $api->lastAmount === [2, 75], "Bedrock take must forward dollars and cents");
+	$currency->decimals = false;
+	$before = $api->calls;
+	$bedrock->setMoney($player, 1.25, static function (bool $result) use (&$success): void { $success = $result; });
+	expect($success === false && $api->calls === $before, "Whole-unit Bedrock currency must reject cents");
+	$bedrock->setMoney($player, 2.0, static function (bool $result) use (&$success): void { $success = $result; });
+	expect($success === true && $api->lastAmount === [2, 0], "Whole-unit Bedrock currency must accept whole units");
+	$currency->decimals = true;
 
 	SimpleEconomy::$instance = $simpleEconomy = new SimpleEconomy();
 	$simpleProvider = new SimpleEconomyProvider();
@@ -234,5 +280,5 @@ namespace {
 	}
 	expect(!$unavailableFactoryCalled, "Unavailable provider factory must not run");
 
-	echo "PASS: XP and SimpleEconomy amount guards, Bedrock cents, provider factory, aliases and availability\n";
+	echo "PASS: XP, SimpleEconomy and Bedrock amount guards, provider factory, aliases and availability\n";
 }

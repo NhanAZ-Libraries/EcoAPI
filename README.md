@@ -17,6 +17,8 @@ EcoAPI checks availability when a provider is selected. Provider specific money 
 
 SimpleEconomy stores whole units. Its adapter rejects fractional, non-finite, negative and out-of-range amounts; adding or taking money also requires an amount greater than zero. A successful callback reports that SimpleEconomy accepted the immediate in-memory change, while its SQL save continues asynchronously. Balance reads can return the configured default when a player's session has not loaded; that value is not proof of a persisted balance.
 
+The BedrockEconomy adapter accepts finite, nonnegative balances for `setMoney()` and positive amounts for `addMoney()` and `takeMoney()`. It rejects values that would change when represented to two decimal places, and accepts whole units only when the configured currency disables decimals. Rejected amounts call the supplied callback with `false` without submitting a transaction. A success callback reports the underlying BedrockEconomy operation; live provider and connected-player persistence remain unverified.
+
 ## Installation and building
 
 For a source based plugin, place a pinned EcoAPI source checkout under `virions/EcoAPI` and declare the virion in your plugin's `devtools.yml`:
