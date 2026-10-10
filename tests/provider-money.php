@@ -100,6 +100,44 @@ namespace pocketmine\player {
 	}
 }
 
+namespace onebone\economyapi {
+	final class EconomyAPI {
+		public const RET_SUCCESS = 1;
+		public const RET_CANCELLED = 2;
+		public static ?self $instance = null;
+		public bool $accept = true;
+		/** @var list<array{string, float}> */
+		public array $calls = [];
+
+		public static function getInstance(): self {
+			return self::$instance ??= new self();
+		}
+
+		public function getMonetaryUnit(): string {
+			return "$";
+		}
+
+		public function myMoney(\pocketmine\player\Player $player): float {
+			return 47.25;
+		}
+
+		public function setMoney(\pocketmine\player\Player $player, float $amount): int {
+			$this->calls[] = ["set", $amount];
+			return $this->accept ? self::RET_SUCCESS : self::RET_CANCELLED;
+		}
+
+		public function addMoney(\pocketmine\player\Player $player, float $amount): int {
+			$this->calls[] = ["add", $amount];
+			return $this->accept ? self::RET_SUCCESS : self::RET_CANCELLED;
+		}
+
+		public function reduceMoney(\pocketmine\player\Player $player, float $amount): int {
+			$this->calls[] = ["reduce", $amount];
+			return $this->accept ? self::RET_SUCCESS : self::RET_CANCELLED;
+		}
+	}
+}
+
 namespace NhanAZ\SimpleEconomy {
 	final class Main {
 		public static ?self $instance = null;
@@ -219,6 +257,7 @@ namespace {
 	use NhanAZ\EcoAPI\provider\SimpleEconomyProvider;
 	use NhanAZ\EcoAPI\provider\XPProvider;
 	use NhanAZ\SimpleEconomy\Main as SimpleEconomy;
+	use onebone\economyapi\EconomyAPI as EconomyBackend;
 	use pocketmine\player\Player;
 	use pocketmine\Server;
 
@@ -294,6 +333,30 @@ namespace {
 	expect($success === true && $api->lastAmount === [2, 0], "Whole-unit Bedrock currency must accept whole units");
 	$currency->decimals = true;
 
+	$economyBackend = EconomyBackend::getInstance();
+	$economyProvider = new EconomyAPIProvider();
+	foreach ([NAN, INF, -INF, -1.0, 0.001, 1.005] as $invalid) {
+		foreach (["setMoney", "addMoney", "takeMoney"] as $method) {
+			$before = count($economyBackend->calls);
+			$success = null;
+			$economyProvider->{$method}($player, $invalid, static function (bool $result) use (&$success): void { $success = $result; });
+			expect($success === false && count($economyBackend->calls) === $before, "EconomyAPI must reject invalid amounts before mutation");
+		}
+	}
+	foreach (["addMoney", "takeMoney"] as $method) {
+		$before = count($economyBackend->calls);
+		$economyProvider->{$method}($player, 0.0, static function (bool $result) use (&$success): void { $success = $result; });
+		expect($success === false && count($economyBackend->calls) === $before, "EconomyAPI transfers must be positive");
+	}
+	$economyProvider->setMoney($player, 0.0, static function (bool $result) use (&$success): void { $success = $result; });
+	$economyProvider->addMoney($player, 0.10, static function (bool $result) use (&$success): void { $success = $result; });
+	$economyProvider->takeMoney($player, 3.05, static function (bool $result) use (&$success): void { $success = $result; });
+	expect($success === true && $economyBackend->calls === [["set", 0.0], ["add", 0.10], ["reduce", 3.05]], "EconomyAPI must receive valid cent amounts unchanged");
+	$economyBackend->accept = false;
+	$economyProvider->takeMoney($player, 1.0, static function (bool $result) use (&$success): void { $success = $result; });
+	expect($success === false, "EconomyAPI backend cancellation must reach the callback");
+	$economyBackend->accept = true;
+
 	SimpleEconomy::$instance = $simpleEconomy = new SimpleEconomy();
 	$simpleProvider = new SimpleEconomyProvider();
 	foreach ([NAN, INF, -INF, -1.0, 0.5, 1.5, (float) PHP_INT_MAX] as $invalid) {
@@ -366,5 +429,5 @@ namespace {
 	}
 	expect(!$unavailableFactoryCalled, "Unavailable provider factory must not run");
 
-	echo "PASS: XP, SimpleEconomy and Bedrock amount guards, provider factory, aliases and enabled-state availability\n";
+	echo "PASS: XP, SimpleEconomy, EconomyAPI and Bedrock amount guards, provider factory, aliases and enabled-state availability\n";
 }

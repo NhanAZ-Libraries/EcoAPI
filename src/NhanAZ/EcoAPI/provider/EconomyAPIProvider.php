@@ -49,6 +49,10 @@ class EconomyAPIProvider implements EconomyProvider {
 	}
 
 	public function setMoney(Player $player, float $amount, ?Closure $callback = null): void {
+		if (!$this->validAmount($amount, false)) {
+			$callback?->__invoke(false);
+			return;
+		}
 		$result = $this->api->setMoney($player, $amount);
 		if ($callback !== null) {
 			$callback($result === EconomyAPI::RET_SUCCESS);
@@ -56,6 +60,10 @@ class EconomyAPIProvider implements EconomyProvider {
 	}
 
 	public function addMoney(Player $player, float $amount, ?Closure $callback = null): void {
+		if (!$this->validAmount($amount, true)) {
+			$callback?->__invoke(false);
+			return;
+		}
 		$result = $this->api->addMoney($player, $amount);
 		if ($callback !== null) {
 			$callback($result === EconomyAPI::RET_SUCCESS);
@@ -63,9 +71,19 @@ class EconomyAPIProvider implements EconomyProvider {
 	}
 
 	public function takeMoney(Player $player, float $amount, ?Closure $callback = null): void {
+		if (!$this->validAmount($amount, true)) {
+			$callback?->__invoke(false);
+			return;
+		}
 		$result = $this->api->reduceMoney($player, $amount);
 		if ($callback !== null) {
 			$callback($result === EconomyAPI::RET_SUCCESS);
 		}
+	}
+
+	private function validAmount(float $amount, bool $positive): bool {
+		return is_finite($amount)
+			&& ($positive ? $amount > 0 : $amount >= 0)
+			&& round($amount, 2) === $amount;
 	}
 }

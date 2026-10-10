@@ -19,6 +19,8 @@ An optional provider is available only after its plugin is enabled. A consumer t
 
 SimpleEconomy stores whole units. Its adapter rejects fractional, non-finite, negative and out-of-range amounts; adding or taking money also requires an amount greater than zero. A successful callback reports that SimpleEconomy accepted the immediate in-memory change, while its SQL save continues asynchronously. Balance reads can return the configured default when a player's session has not loaded; that value is not proof of a persisted balance.
 
+EconomyAPI rounds submitted amounts to two decimal places. Its adapter rejects non-finite, negative and subcent amounts before submission; adding or taking money also requires a positive amount. A successful callback reports the backend return code, while persistence depends on the configured EconomyAPI provider. Connected-player and persistence integration for EconomyAPI remain unverified.
+
 The BedrockEconomy adapter accepts finite, nonnegative balances for `setMoney()` and positive amounts for `addMoney()` and `takeMoney()`. It rejects values that would change when represented to two decimal places, and accepts whole units only when the configured currency disables decimals. BedrockEconomy 4.0.4 stores cent values from 01 through 09 incorrectly, so the adapter rejects amounts with those cent components instead of risking an incorrect persisted balance. Rejected amounts call the supplied callback with `false` without submitting a transaction. A success callback reports the underlying BedrockEconomy operation; connected-player and database failure behavior remain unverified.
 
 ## Installation and building
