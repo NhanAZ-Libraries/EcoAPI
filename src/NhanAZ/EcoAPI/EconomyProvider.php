@@ -24,6 +24,9 @@ use pocketmine\player\Player;
  * All money-modifying methods use callbacks because some economy plugins
  * (like BedrockEconomy) perform database operations asynchronously.
  * For synchronous plugins (like EconomyAPI), the callback is called immediately.
+ * A backend can suppress completion callbacks: BedrockEconomy 4.0.4 does so
+ * when a listener cancels TransactionSubmitEvent. See the README before
+ * relying on callback delivery for a transaction.
  */
 interface EconomyProvider {
 
@@ -61,7 +64,7 @@ interface EconomyProvider {
 	 *
 	 * @param Player $player The player to modify
 	 * @param float $amount The new balance (must be >= 0)
-	 * @param (Closure(bool): void)|null $callback Called with true on success, false on failure
+	 * @param (Closure(bool): void)|null $callback If invoked, receives true on success or false on failure
 	 */
 	public function setMoney(Player $player, float $amount, ?Closure $callback = null): void;
 
@@ -70,7 +73,7 @@ interface EconomyProvider {
 	 *
 	 * @param Player $player The player to modify
 	 * @param float $amount The amount to add (must be > 0)
-	 * @param (Closure(bool): void)|null $callback Called with true on success, false on failure
+	 * @param (Closure(bool): void)|null $callback If invoked, receives true on success or false on failure
 	 */
 	public function addMoney(Player $player, float $amount, ?Closure $callback = null): void;
 
@@ -79,7 +82,7 @@ interface EconomyProvider {
 	 *
 	 * @param Player $player The player to modify
 	 * @param float $amount The amount to take (must be > 0)
-	 * @param (Closure(bool): void)|null $callback Called with true on success, false on failure
+	 * @param (Closure(bool): void)|null $callback If invoked, receives true on success or false on failure
 	 */
 	public function takeMoney(Player $player, float $amount, ?Closure $callback = null): void;
 }
