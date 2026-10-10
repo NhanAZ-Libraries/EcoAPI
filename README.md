@@ -23,6 +23,8 @@ EconomyAPI rounds submitted amounts to two decimal places. Its adapter rejects n
 
 The BedrockEconomy adapter accepts finite, nonnegative balances for `setMoney()` and positive amounts for `addMoney()` and `takeMoney()`. It rejects values that would change when represented to two decimal places, and accepts whole units only when the configured currency disables decimals. BedrockEconomy 4.0.4 stores cent values from 01 through 09 incorrectly, so the adapter rejects amounts with those cent components instead of risking an incorrect persisted balance. Rejected amounts call the supplied callback with `false` without submitting a transaction. A success callback reports the underlying BedrockEconomy operation; connected-player and database failure behavior remain unverified.
 
+In the tested BedrockEconomy 4.0.4 PHAR, a listener that cancels `TransactionSubmitEvent` causes `set`, `add` and `subtract` to return without invoking either backend callback. EcoAPI cannot report a result in that case. Consumers must not interpret a missing callback as success or use this adapter for a transaction that requires a guaranteed completion signal. An isolated server probe confirmed that a cancelled `setMoney()` call invoked no callback and left the persisted balance unchanged. Cancellation of `addMoney()` and `takeMoney()` follows the same path in the packaged backend code but has not been runtime tested.
+
 ## Installation and building
 
 For a source based plugin, place a pinned EcoAPI source checkout under `virions/EcoAPI` and declare the virion in your plugin's `devtools.yml`:
