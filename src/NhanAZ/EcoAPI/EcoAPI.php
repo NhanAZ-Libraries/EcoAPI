@@ -11,12 +11,14 @@ declare(strict_types=1);
 
 namespace NhanAZ\EcoAPI;
 
+use Closure;
 use NhanAZ\EcoAPI\exception\MissingProviderDependencyException;
 use NhanAZ\EcoAPI\exception\UnknownProviderException;
 use NhanAZ\EcoAPI\provider\BedrockEconomyProvider;
 use NhanAZ\EcoAPI\provider\EconomyAPIProvider;
 use NhanAZ\EcoAPI\provider\SimpleEconomyProvider;
 use NhanAZ\EcoAPI\provider\XPProvider;
+use function spl_object_id;
 
 /**
  * Main entry point for EcoAPI.
@@ -33,8 +35,8 @@ use NhanAZ\EcoAPI\provider\XPProvider;
 final class EcoAPI {
 
 	/**
-	 * @var array<string, class-string<EconomyProvider>>
-	 * Maps provider names (lowercase) to their class names.
+	 * @var array<string, array{factory: Closure(): EconomyProvider, available: Closure(): bool}>
+	 * Maps provider names (lowercase) to shared factory registrations.
 	 */
 	private static array $providers = [];
 
@@ -57,10 +59,26 @@ final class EcoAPI {
 		}
 		self::$initialized = true;
 
-		self::registerProvider(EconomyAPIProvider::class, "economyapi", "economy");
-		self::registerProvider(BedrockEconomyProvider::class, "bedrockeconomy", "bedrock");
-		self::registerProvider(SimpleEconomyProvider::class, "simpleeconomy", "simple");
-		self::registerProvider(XPProvider::class, "xp", "exp", "experience");
+		self::registerProvider(
+			static fn(): EconomyProvider => new EconomyAPIProvider(),
+			static fn(): bool => EconomyAPIProvider::isAvailable(),
+			"economyapi", "economy"
+		);
+		self::registerProvider(
+			static fn(): EconomyProvider => new BedrockEconomyProvider(),
+			static fn(): bool => BedrockEconomyProvider::isAvailable(),
+			"bedrockeconomy", "bedrock"
+		);
+		self::registerProvider(
+			static fn(): EconomyProvider => new SimpleEconomyProvider(),
+			static fn(): bool => SimpleEconomyProvider::isAvailable(),
+			"simpleeconomy", "simple"
+		);
+		self::registerProvider(
+			static fn(): EconomyProvider => new XPProvider(),
+			static fn(): bool => XPProvider::isAvailable(),
+			"xp", "exp", "experience"
+		);
 	}
 
 	/**
@@ -70,14 +88,20 @@ final class EcoAPI {
 	 * Names are case-insensitive.
 	 *
 	 * Example:
-	 *   EcoAPI::registerProvider(MyProvider::class, "myprovider", "myeco");
+	 *   EcoAPI::registerProvider(
+	 *       static fn(): EconomyProvider => new MyProvider(),
+	 *       static fn(): bool => MyProvider::isAvailable(),
+	 *       "myprovider", "myeco"
+	 *   );
 	 *
-	 * @param class-string<EconomyProvider> $providerClass The provider class
+	 * @param Closure(): EconomyProvider $factory Creates a provider instance
+	 * @param Closure(): bool $isAvailable Checks the provider dependency
 	 * @param string ...$names One or more names/aliases for this provider
 	 */
-	public static function registerProvider(string $providerClass, string ...$names): void {
+	public static function registerProvider(Closure $factory, Closure $isAvailable, string ...$names): void {
+		$registration = ["factory" => $factory, "available" => $isAvailable];
 		foreach ($names as $name) {
-			self::$providers[strtolower($name)] = $providerClass;
+			self::$providers[strtolower($name)] = $registration;
 		}
 	}
 
@@ -99,15 +123,15 @@ final class EcoAPI {
 			);
 		}
 
-		$class = self::$providers[$key];
+		$registration = self::$providers[$key];
 
-		if (!$class::isAvailable()) {
+		if (!$registration["available"]()) {
 			throw new MissingProviderDependencyException(
 				"Economy provider \"{$name}\" is not available. Is the required plugin installed and enabled?"
 			);
 		}
 
-		return new $class();
+		return $registration["factory"]();
 	}
 
 	/**
@@ -120,14 +144,16 @@ final class EcoAPI {
 	 */
 	public static function detectProvider(): ?EconomyProvider {
 		$seen = [];
-		foreach (self::$providers as $class) {
-			if (isset($seen[$class])) {
+		foreach (self::$providers as $registration) {
+			$factory = $registration["factory"];
+			$id = spl_object_id($factory);
+			if (isset($seen[$id])) {
 				continue;
 			}
-			$seen[$class] = true;
+			$seen[$id] = true;
 
-			if ($class::isAvailable()) {
-				return new $class();
+			if ($registration["available"]()) {
+				return $factory();
 			}
 		}
 		return null;
@@ -159,13 +185,14 @@ final class EcoAPI {
 	public static function getAvailableProviders(): array {
 		$available = [];
 		$seen = [];
-		foreach (self::$providers as $name => $class) {
-			if (isset($seen[$class])) {
+		foreach (self::$providers as $name => $registration) {
+			$id = spl_object_id($registration["factory"]);
+			if (isset($seen[$id])) {
 				continue;
 			}
-			$seen[$class] = true;
+			$seen[$id] = true;
 
-			if ($class::isAvailable()) {
+			if ($registration["available"]()) {
 				$available[] = $name;
 			}
 		}

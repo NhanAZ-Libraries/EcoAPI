@@ -40,27 +40,29 @@ class XPProvider implements EconomyProvider {
 	}
 
 	public function setMoney(Player $player, float $amount, ?Closure $callback = null): void {
-		$player->getXpManager()->setXpLevel((int) $amount);
-		$player->getXpManager()->setXpProgress(0.0);
-		if ($callback !== null) {
-			$callback(true);
-		}
+		$success = self::isWholeAmount($amount, false)
+			&& $player->getXpManager()->setXpAndProgress((int) $amount, 0.0);
+		$callback?->__invoke($success);
 	}
 
 	public function addMoney(Player $player, float $amount, ?Closure $callback = null): void {
-		$player->getXpManager()->addXpLevels((int) $amount);
-		if ($callback !== null) {
-			$callback(true);
-		}
+		$success = self::isWholeAmount($amount, true)
+			&& $player->getXpManager()->addXpLevels((int) $amount);
+		$callback?->__invoke($success);
 	}
 
 	public function takeMoney(Player $player, float $amount, ?Closure $callback = null): void {
-		$current = $player->getXpManager()->getXpLevel();
-		$new = max(0, $current - (int) $amount);
-		$player->getXpManager()->setXpLevel($new);
-		$player->getXpManager()->setXpProgress(0.0);
-		if ($callback !== null) {
-			$callback(true);
-		}
+		$manager = $player->getXpManager();
+		$success = self::isWholeAmount($amount, true)
+			&& $manager->getXpLevel() >= $amount
+			&& $manager->setXpAndProgress($manager->getXpLevel() - (int) $amount, 0.0);
+		$callback?->__invoke($success);
+	}
+
+	private static function isWholeAmount(float $amount, bool $positive): bool {
+		return is_finite($amount)
+			&& ($positive ? $amount > 0 : $amount >= 0)
+			&& $amount < PHP_INT_MAX
+			&& floor($amount) === $amount;
 	}
 }

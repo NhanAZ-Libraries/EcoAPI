@@ -56,9 +56,9 @@ class BedrockEconomyProvider implements EconomyProvider {
 	public function getMoney(Player $player, Closure $callback): void {
 		$entry = GlobalCache::ONLINE()->get($player->getName());
 		if ($entry !== null) {
-			$callback((float) "{$entry->amount}.{$entry->decimals}");
+			$callback($entry->amount + $entry->decimals / 100);
 		} else {
-			$callback((float) "{$this->currency->defaultAmount}.{$this->currency->defaultDecimals}");
+			$callback($this->currency->defaultAmount + $this->currency->defaultDecimals / 100);
 		}
 	}
 
@@ -127,7 +127,7 @@ class BedrockEconomyProvider implements EconomyProvider {
 	 * e.g., 123.45 => 45, 100.0 => 0
 	 */
 	private static function extractDecimals(float $amount): int {
-		$parts = explode(".", (string) $amount);
-		return (int) ($parts[1] ?? 0);
+		$parts = explode(".", number_format($amount, 2, ".", ""));
+		return (int) $parts[1];
 	}
 }

@@ -1,0 +1,7 @@
+parameters:
+  bootstrapFiles:
+    - vendor/autoload.php
+  scanDirectories:
+    - .devtools-dependencies/SimpleEconomy/src
+    - .devtools-dependencies/BedrockEconomy/src
+    - .devtools-dependencies/EconomyAPI/src
