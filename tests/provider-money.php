@@ -264,9 +264,9 @@ namespace {
 	expect($balance === 1.05, "Cached Bedrock balance with five cents must be 1.05");
 	$bedrock->setMoney($player, 1.5, static function (bool $result) use (&$success): void { $success = $result; });
 	expect($success === true && $api->lastAmount === [1, 50], "Bedrock 1.50 must send 50 cents to the API");
-	$bedrock->setMoney($player, 1.05, static function (bool $result) use (&$success): void { $success = $result; });
-	expect($success === true && $api->lastAmount === [1, 5], "Bedrock 1.05 must send five cents to the API");
-	foreach ([NAN, INF, -INF, -1.0, 0.001, 1.005, (float) PHP_INT_MAX] as $invalid) {
+	$bedrock->setMoney($player, 1.10, static function (bool $result) use (&$success): void { $success = $result; });
+	expect($success === true && $api->lastAmount === [1, 10], "Bedrock 1.10 must send ten cents to the API");
+	foreach ([NAN, INF, -INF, -1.0, 0.001, 1.005, 0.01, 1.05, 3.09, (float) PHP_INT_MAX] as $invalid) {
 		foreach (["setMoney", "addMoney", "takeMoney"] as $method) {
 			$before = $api->calls;
 			$success = null;
@@ -282,8 +282,8 @@ namespace {
 	}
 	$bedrock->setMoney($player, 0.0, static function (bool $result) use (&$success): void { $success = $result; });
 	expect($success === true && $api->lastOperation === "set" && $api->lastAmount === [0, 0], "Bedrock may set a zero balance");
-	$bedrock->addMoney($player, 0.01, static function (bool $result) use (&$success): void { $success = $result; });
-	expect($success === true && $api->lastOperation === "add" && $api->lastAmount === [0, 1], "Bedrock add must forward one cent");
+	$bedrock->addMoney($player, 0.10, static function (bool $result) use (&$success): void { $success = $result; });
+	expect($success === true && $api->lastOperation === "add" && $api->lastAmount === [0, 10], "Bedrock add must forward ten cents");
 	$bedrock->takeMoney($player, 2.75, static function (bool $result) use (&$success): void { $success = $result; });
 	expect($success === true && $api->lastOperation === "subtract" && $api->lastAmount === [2, 75], "Bedrock take must forward dollars and cents");
 	$currency->decimals = false;

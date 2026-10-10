@@ -145,9 +145,11 @@ class BedrockEconomyProvider implements EconomyProvider {
 			return null;
 		}
 		[$units, $cents] = explode(".", $formatted, 2);
-		if (!$this->currency->decimals && (int) $cents !== 0) {
+		$cents = (int) $cents;
+		// BedrockEconomy 4.0.4 persists 05 cents as .5; refuse amounts it cannot store faithfully.
+		if (($cents > 0 && $cents < 10) || (!$this->currency->decimals && $cents !== 0)) {
 			return null;
 		}
-		return [(int) $units, (int) $cents];
+		return [(int) $units, $cents];
 	}
 }
