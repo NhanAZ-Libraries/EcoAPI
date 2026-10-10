@@ -52,6 +52,35 @@ namespace pocketmine\player {
 	}
 }
 
+namespace NhanAZ\SimpleEconomy {
+	final class Main {
+		public static ?self $instance = null;
+
+		/** @var list<array{string, string, int}> */
+		public array $calls = [];
+		public bool $accept = true;
+
+		public static function getInstance(): ?self {
+			return self::$instance;
+		}
+
+		public function setMoney(string $name, int $amount): bool {
+			$this->calls[] = ["set", $name, $amount];
+			return $this->accept;
+		}
+
+		public function addMoney(string $name, int $amount): bool {
+			$this->calls[] = ["add", $name, $amount];
+			return $this->accept;
+		}
+
+		public function reduceMoney(string $name, int $amount): bool {
+			$this->calls[] = ["reduce", $name, $amount];
+			return $this->accept;
+		}
+	}
+}
+
 namespace cooldogedev\BedrockEconomy\currency {
 	final class Currency {
 		public string $symbol = "$";
@@ -99,6 +128,7 @@ namespace {
 	require __DIR__ . "/../src/NhanAZ/EcoAPI/EconomyProvider.php";
 	require __DIR__ . "/../src/NhanAZ/EcoAPI/provider/XPProvider.php";
 	require __DIR__ . "/../src/NhanAZ/EcoAPI/provider/BedrockEconomyProvider.php";
+	require __DIR__ . "/../src/NhanAZ/EcoAPI/provider/SimpleEconomyProvider.php";
 	require __DIR__ . "/../src/NhanAZ/EcoAPI/exception/MissingProviderDependencyException.php";
 	require __DIR__ . "/../src/NhanAZ/EcoAPI/exception/UnknownProviderException.php";
 	require __DIR__ . "/../src/NhanAZ/EcoAPI/EcoAPI.php";
@@ -110,7 +140,9 @@ namespace {
 	use EcoAPITest\ExperienceManager;
 	use NhanAZ\EcoAPI\EcoAPI;
 	use NhanAZ\EcoAPI\provider\BedrockEconomyProvider;
+	use NhanAZ\EcoAPI\provider\SimpleEconomyProvider;
 	use NhanAZ\EcoAPI\provider\XPProvider;
+	use NhanAZ\SimpleEconomy\Main as SimpleEconomy;
 	use pocketmine\player\Player;
 
 	function expect(bool $condition, string $message): void {
@@ -158,6 +190,30 @@ namespace {
 	$bedrock->setMoney($player, 1.05, static function (bool $result) use (&$success): void { $success = $result; });
 	expect($success === true && $api->lastAmount === [1, 5], "Bedrock 1.05 must send five cents to the API");
 
+	SimpleEconomy::$instance = $simpleEconomy = new SimpleEconomy();
+	$simpleProvider = new SimpleEconomyProvider();
+	foreach ([NAN, INF, -INF, -1.0, 0.5, 1.5, (float) PHP_INT_MAX] as $invalid) {
+		foreach (["setMoney", "addMoney", "takeMoney"] as $method) {
+			$before = count($simpleEconomy->calls);
+			$success = null;
+			$simpleProvider->{$method}($player, $invalid, static function (bool $result) use (&$success): void { $success = $result; });
+			expect($success === false && count($simpleEconomy->calls) === $before, "SimpleEconomy must reject invalid whole-unit amounts before mutation");
+		}
+	}
+	foreach (["addMoney", "takeMoney"] as $method) {
+		$before = count($simpleEconomy->calls);
+		$success = null;
+		$simpleProvider->{$method}($player, 0.0, static function (bool $result) use (&$success): void { $success = $result; });
+		expect($success === false && count($simpleEconomy->calls) === $before, "SimpleEconomy transfer amounts must be positive");
+	}
+	$simpleProvider->setMoney($player, 0.0, static function (bool $result) use (&$success): void { $success = $result; });
+	expect($success === true && $simpleEconomy->calls === [["set", "Tester", 0]], "SimpleEconomy may set a zero balance exactly");
+	$simpleProvider->addMoney($player, 3.0, static function (bool $result) use (&$success): void { $success = $result; });
+	expect($success === true && $simpleEconomy->calls[1] === ["add", "Tester", 3], "SimpleEconomy must receive exact whole units");
+	$simpleEconomy->accept = false;
+	$simpleProvider->takeMoney($player, 2.0, static function (bool $result) use (&$success): void { $success = $result; });
+	expect($success === false && $simpleEconomy->calls[2] === ["reduce", "Tester", 2], "SimpleEconomy rejection must reach the callback");
+
 	EcoAPI::registerProvider(static fn(): XPProvider => new XPProvider(), static fn(): bool => true, "testxp", "xp-alias");
 	expect(EcoAPI::getProvider("XP-ALIAS") instanceof XPProvider, "Provider alias must resolve without dynamic class construction");
 	expect(EcoAPI::detectProvider() instanceof XPProvider, "Available custom provider must be detected");
@@ -178,5 +234,5 @@ namespace {
 	}
 	expect(!$unavailableFactoryCalled, "Unavailable provider factory must not run");
 
-	echo "PASS: XP balance guards, Bedrock cents, provider factory, aliases and availability\n";
+	echo "PASS: XP and SimpleEconomy amount guards, Bedrock cents, provider factory, aliases and availability\n";
 }

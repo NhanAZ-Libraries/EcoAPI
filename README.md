@@ -15,6 +15,8 @@ EcoAPI gives PocketMine-MP plugins one callback based interface for several econ
 
 EcoAPI checks availability when a provider is selected. Provider specific money operations have different storage and callback behavior. Test the selected provider with disposable balances before using it on a live server.
 
+SimpleEconomy stores whole units. Its adapter rejects fractional, non-finite, negative and out-of-range amounts; adding or taking money also requires an amount greater than zero. A successful callback reports that SimpleEconomy accepted the immediate in-memory change, while its SQL save continues asynchronously. Balance reads can return the configured default when a player's session has not loaded; that value is not proof of a persisted balance.
+
 ## Installation and building
 
 For a source based plugin, place a pinned EcoAPI source checkout under `virions/EcoAPI` and declare the virion in your plugin's `devtools.yml`:
