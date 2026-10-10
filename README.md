@@ -74,6 +74,6 @@ This registration signature replaces the older class string argument before the 
 
 ## Verification and support
 
-The repository runs [PHPStan at maximum level](phpstan.neon.dist), PHP lint and provider behavior fixtures. Its workflow pins checkout, server setup, DevTools and artifact upload revisions. The companion PHAR and a consumer example were built and inspected locally with DevTools. Live EconomyAPI, BedrockEconomy and SimpleEconomy gameplay integrations remain unverified.
+The repository runs [PHPStan at maximum level](phpstan.neon.dist), PHP lint and provider behavior fixtures. Its workflow pins checkout, server setup, DevTools and artifact upload revisions. CI builds and validates the companion PHAR and a shaded consumer example. Isolated server probes exercised SimpleEconomy transactions and BedrockEconomy 4.0.4 transactions with synthetic player objects, then checked persisted SQLite balances. Connected-player gameplay, EconomyAPI transactions and database failure handling remain unverified.
 
 Keep player data backups and a previously verified build during upgrades. For support, use [NhanAZ Discord](https://discord.gg/j2X83ujT6c). See the [LICENSE](LICENSE) file for the full Apache License 2.0 text.
