@@ -50,6 +50,10 @@ class SimpleEconomyProvider implements EconomyProvider {
 	}
 
 	public function setMoney(Player $player, float $amount, ?Closure $callback = null): void {
+		if (!self::isWholeAmount($amount, false)) {
+			$callback?->__invoke(false);
+			return;
+		}
 		$success = $this->plugin->setMoney($player->getName(), (int) $amount);
 		if ($callback !== null) {
 			$callback($success);
@@ -57,6 +61,10 @@ class SimpleEconomyProvider implements EconomyProvider {
 	}
 
 	public function addMoney(Player $player, float $amount, ?Closure $callback = null): void {
+		if (!self::isWholeAmount($amount, true)) {
+			$callback?->__invoke(false);
+			return;
+		}
 		$success = $this->plugin->addMoney($player->getName(), (int) $amount);
 		if ($callback !== null) {
 			$callback($success);
@@ -64,9 +72,20 @@ class SimpleEconomyProvider implements EconomyProvider {
 	}
 
 	public function takeMoney(Player $player, float $amount, ?Closure $callback = null): void {
+		if (!self::isWholeAmount($amount, true)) {
+			$callback?->__invoke(false);
+			return;
+		}
 		$success = $this->plugin->reduceMoney($player->getName(), (int) $amount);
 		if ($callback !== null) {
 			$callback($success);
 		}
+	}
+
+	private static function isWholeAmount(float $amount, bool $positive): bool {
+		return is_finite($amount)
+			&& ($positive ? $amount > 0 : $amount >= 0)
+			&& $amount < PHP_INT_MAX
+			&& floor($amount) === $amount;
 	}
 }
