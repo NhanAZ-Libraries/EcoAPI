@@ -49,7 +49,7 @@ class BedrockEconomyProvider implements EconomyProvider {
 
 	public static function isAvailable(): bool {
 		$plugin = Server::getInstance()->getPluginManager()->getPlugin("BedrockEconomy");
-		return $plugin !== null
+		return $plugin instanceof BedrockEconomy
 			&& $plugin->isEnabled()
 			&& version_compare($plugin->getDescription()->getVersion(), "4.0", ">=");
 	}

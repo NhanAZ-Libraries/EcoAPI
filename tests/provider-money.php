@@ -12,7 +12,7 @@ namespace EcoAPITest {
 		}
 	}
 
-	final class Plugin {
+	class Plugin {
 		public function __construct(public bool $enabled = false, public string $version = "4.0.0") {
 		}
 
@@ -104,7 +104,7 @@ namespace pocketmine\player {
 }
 
 namespace onebone\economyapi {
-	final class EconomyAPI {
+	final class EconomyAPI extends \EcoAPITest\Plugin {
 		public const RET_SUCCESS = 1;
 		public const RET_CANCELLED = 2;
 		public static ?self $instance = null;
@@ -172,6 +172,11 @@ namespace NhanAZ\SimpleEconomy {
 			$this->calls[] = ["reduce", $name, $amount];
 			return $this->accept;
 		}
+	}
+}
+
+namespace cooldogedev\BedrockEconomy {
+	final class BedrockEconomy extends \EcoAPITest\Plugin {
 	}
 }
 
@@ -248,6 +253,7 @@ namespace {
 	require __DIR__ . "/../src/NhanAZ/EcoAPI/EcoAPI.php";
 
 	use cooldogedev\BedrockEconomy\api\type\ClosureAPI;
+	use cooldogedev\BedrockEconomy\BedrockEconomy as BedrockBackend;
 	use cooldogedev\BedrockEconomy\currency\Currency;
 	use cooldogedev\BedrockEconomy\database\cache\CacheEntry;
 	use cooldogedev\BedrockEconomy\database\cache\GlobalCache;
@@ -394,12 +400,17 @@ namespace {
 
 	$pluginRegistry = new PluginManager();
 	Server::$instance = new Server($pluginRegistry);
-	$economyPlugin = new Plugin(false);
+	$pluginRegistry->plugins["EconomyAPI"] = new Plugin(true);
+	expect(!EconomyAPIProvider::isAvailable(), "Unrelated plugin named EconomyAPI must not be selected");
+	$economyPlugin = $economyBackend;
+	$economyPlugin->enabled = false;
 	$pluginRegistry->plugins["EconomyAPI"] = $economyPlugin;
 	expect(!EconomyAPIProvider::isAvailable(), "Loaded but disabled EconomyAPI must not be selected");
 	$economyPlugin->enabled = true;
 	expect(EconomyAPIProvider::isAvailable(), "Enabled EconomyAPI must be selectable");
-	$bedrockPlugin = new Plugin(false, "4.0.0");
+	$pluginRegistry->plugins["BedrockEconomy"] = new Plugin(true, "4.0.0");
+	expect(!BedrockEconomyProvider::isAvailable(), "Unrelated plugin named BedrockEconomy must not be selected");
+	$bedrockPlugin = new BedrockBackend(false, "4.0.0");
 	$pluginRegistry->plugins["BedrockEconomy"] = $bedrockPlugin;
 	expect(!BedrockEconomyProvider::isAvailable(), "Loaded but disabled BedrockEconomy must not be selected");
 	$bedrockPlugin->enabled = true;
