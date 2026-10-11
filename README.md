@@ -4,7 +4,7 @@ EcoAPI gives PocketMine-MP plugins one callback based interface for several econ
 
 ## Compatibility and providers
 
-`virion.yml` and `plugin.yml` declare minimum API `5.0.0`, and Composer requires PHP `^8.1`. The full Axolotl-PM 5.x range has not been verified. The [build workflow](.github/workflows/ci.yml) pins the exact server source used for static analysis. A local isolated server boot confirmed the companion PHAR loads, but it did not test live economy services or connected players.
+`virion.yml` and `plugin.yml` declare minimum API `5.0.0`, and Composer requires PHP `^8.1`. The full Axolotl-PM 5.x range has not been verified. The [build workflow](.github/workflows/ci.yml) pins the exact server source used for static analysis. A local isolated server test confirmed that the companion PHAR and example load, and a connected headless client can read its SimpleEconomy balance.
 
 | Provider | Registration names | Runtime requirement |
 |---|---|---|
@@ -80,6 +80,6 @@ This registration signature replaces the older class string argument before the 
 
 ## Verification and support
 
-The repository runs [PHPStan at maximum level](phpstan.neon.dist), PHP lint and provider behavior fixtures. Its workflow pins checkout, server setup, DevTools and artifact upload revisions. CI builds and validates the companion PHAR and a shaded consumer example. Isolated server probes exercised SimpleEconomy and BedrockEconomy 4.0.4 transactions with synthetic player objects, then checked persisted SQLite balances. Scoped SQLite triggers rejected `setMoney()`, `addMoney()` and `takeMoney()` updates on test accounts. Each callback reported failure, and the cached and persisted balances stayed unchanged. A separate EconomyAPI 6.0.0-PM5 probe checked callbacks and the YAML balance after shutdown. Connected-player gameplay, other backend settings and other database failure paths remain unverified.
+The repository runs [PHPStan at maximum level](phpstan.neon.dist), PHP lint and provider behavior fixtures. Its workflow pins checkout, server setup, DevTools and artifact upload revisions. CI builds and validates the companion PHAR and a shaded consumer example. Isolated server probes exercised SimpleEconomy and BedrockEconomy 4.0.4 transactions with synthetic player objects, then checked persisted SQLite balances. Scoped SQLite triggers rejected `setMoney()`, `addMoney()` and `takeMoney()` updates on test accounts. Each callback reported failure, and the cached and persisted balances stayed unchanged. A separate EconomyAPI 6.0.0-PM5 probe checked callbacks and the YAML balance after shutdown. A connected headless client received the example's join message and `/balance` result through SimpleEconomy; SQLite contained the expected test account after shutdown. Bedrock game UI, connected mutations, other providers' connected paths, other backend settings and other database failure paths remain unverified.
 
 Keep player data backups and a previously verified build during upgrades. For support, use [NhanAZ Discord](https://discord.gg/j2X83ujT6c). See the [LICENSE](LICENSE) file for the full Apache License 2.0 text.
