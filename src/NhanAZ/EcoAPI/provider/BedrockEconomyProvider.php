@@ -16,6 +16,7 @@ use cooldogedev\BedrockEconomy\api\BedrockEconomyAPI;
 use cooldogedev\BedrockEconomy\api\type\ClosureAPI;
 use cooldogedev\BedrockEconomy\BedrockEconomy;
 use cooldogedev\BedrockEconomy\currency\Currency;
+use cooldogedev\BedrockEconomy\database\constant\UpdateMode;
 use cooldogedev\BedrockEconomy\database\cache\GlobalCache;
 use NhanAZ\EcoAPI\EconomyProvider;
 use pocketmine\player\Player;
@@ -25,7 +26,7 @@ use pocketmine\Server;
  * Economy provider for cooldogedev/BedrockEconomy (v4.0+).
  *
  * BedrockEconomy uses asynchronous database operations,
- * so all callbacks may be called on a later tick.
+ * so database result callbacks may be called on a later tick.
  *
  * @see https://poggit.pmmp.io/p/BedrockEconomy
  */
@@ -33,10 +34,13 @@ class BedrockEconomyProvider implements EconomyProvider {
 
 	private ClosureAPI $api;
 	private Currency $currency;
+	private BedrockEconomyCancellationListener $cancellationListener;
 
 	public function __construct() {
+		$backend = BedrockEconomy::getInstance();
 		$this->api = BedrockEconomyAPI::CLOSURE();
-		$this->currency = BedrockEconomy::getInstance()->getCurrency();
+		$this->currency = $backend->getCurrency();
+		$this->cancellationListener = BedrockEconomyCancellationListener::forBackend($backend);
 	}
 
 	public function getName(): string {
@@ -69,22 +73,7 @@ class BedrockEconomyProvider implements EconomyProvider {
 			$callback?->__invoke(false);
 			return;
 		}
-		$this->api->set(
-			$player->getXuid(),
-			$player->getName(),
-			$parts[0],
-			$parts[1],
-			function () use ($callback): void {
-				if ($callback !== null) {
-					$callback(true);
-				}
-			},
-			function () use ($callback): void {
-				if ($callback !== null) {
-					$callback(false);
-				}
-			}
-		);
+		$this->submitMutation($player, $parts, UpdateMode::SET, $callback);
 	}
 
 	public function addMoney(Player $player, float $amount, ?Closure $callback = null): void {
@@ -93,22 +82,7 @@ class BedrockEconomyProvider implements EconomyProvider {
 			$callback?->__invoke(false);
 			return;
 		}
-		$this->api->add(
-			$player->getXuid(),
-			$player->getName(),
-			$parts[0],
-			$parts[1],
-			function () use ($callback): void {
-				if ($callback !== null) {
-					$callback(true);
-				}
-			},
-			function () use ($callback): void {
-				if ($callback !== null) {
-					$callback(false);
-				}
-			}
-		);
+		$this->submitMutation($player, $parts, UpdateMode::ADD, $callback);
 	}
 
 	public function takeMoney(Player $player, float $amount, ?Closure $callback = null): void {
@@ -117,22 +91,32 @@ class BedrockEconomyProvider implements EconomyProvider {
 			$callback?->__invoke(false);
 			return;
 		}
-		$this->api->subtract(
-			$player->getXuid(),
-			$player->getName(),
-			$parts[0],
-			$parts[1],
-			function () use ($callback): void {
-				if ($callback !== null) {
-					$callback(true);
-				}
-			},
-			function () use ($callback): void {
-				if ($callback !== null) {
-					$callback(false);
-				}
+		$this->submitMutation($player, $parts, UpdateMode::SUBTRACT, $callback);
+	}
+
+	/** @param array{int, int} $parts */
+	private function submitMutation(Player $player, array $parts, int $mode, ?Closure $callback): void {
+		$xuid = $player->getXuid();
+		$username = $player->getName();
+		$amount = $parts[0];
+		$decimals = $parts[1];
+		$request = function(Closure $onSuccess, Closure $onError) use ($xuid, $username, $amount, $decimals, $mode): void {
+			switch ($mode) {
+				case UpdateMode::SET:
+					$this->api->set($xuid, $username, $amount, $decimals, $onSuccess, $onError);
+					return;
+				case UpdateMode::ADD:
+					$this->api->add($xuid, $username, $amount, $decimals, $onSuccess, $onError);
+					return;
+				case UpdateMode::SUBTRACT:
+					$this->api->subtract($xuid, $username, $amount, $decimals, $onSuccess, $onError);
+					return;
+				default:
+					throw new \InvalidArgumentException("Unsupported BedrockEconomy update mode: {$mode}");
 			}
-		);
+		};
+
+		$this->cancellationListener->submitMutation($xuid, $username, $mode, $amount, $decimals, $request, $callback);
 	}
 
 	/** @return array{int, int}|null */

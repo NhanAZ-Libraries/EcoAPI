@@ -84,6 +84,11 @@ namespace pocketmine {
 	}
 }
 
+namespace pocketmine\event {
+	interface Listener {
+	}
+}
+
 namespace pocketmine\player {
 	final class Player {
 		public function __construct(private \EcoAPITest\ExperienceManager $manager) {
@@ -212,38 +217,112 @@ namespace cooldogedev\BedrockEconomy\database\cache {
 	}
 }
 
+namespace cooldogedev\BedrockEconomy\database\constant {
+	interface UpdateMode {
+		public const ADD = 0;
+		public const SUBTRACT = 1;
+		public const SET = 2;
+	}
+}
+
+namespace cooldogedev\BedrockEconomy\database\transaction {
+	final class UpdateTransaction {
+		public function __construct(
+			public readonly string $username,
+			public readonly string $xuid,
+			public readonly int $mode,
+			public readonly int $amount,
+			public readonly int $decimals
+		) {
+		}
+	}
+}
+
+namespace cooldogedev\BedrockEconomy\event\transaction {
+	final class TransactionSubmitEvent {
+		private bool $cancelled = false;
+
+		public function __construct(public readonly \cooldogedev\BedrockEconomy\database\transaction\UpdateTransaction $transaction) {
+		}
+
+		public function cancel(): void {
+			$this->cancelled = true;
+		}
+
+		public function isCancelled(): bool {
+			return $this->cancelled;
+		}
+	}
+}
+
 namespace cooldogedev\BedrockEconomy\api\type {
 	final class ClosureAPI {
 		/** @var array{int, int}|null */
 		public ?array $lastAmount = null;
 		public ?string $lastOperation = null;
 		public int $calls = 0;
+		public ?\NhanAZ\EcoAPI\provider\BedrockEconomyCancellationListener $cancellationListener = null;
+		public bool $cancelNext = false;
+		public bool $cancelUnmatchedFirst = false;
+
+		private function submit(string $operation, string $xuid, string $name, int $amount, int $decimals, \Closure $onSuccess): void {
+			if (!$this->cancelNext) {
+				$onSuccess();
+				return;
+			}
+			$this->cancelNext = false;
+			if ($this->cancellationListener === null) {
+				throw new \RuntimeException("Cancellation listener is not configured");
+			}
+
+			$mode = match ($operation) {
+				"set" => \cooldogedev\BedrockEconomy\database\constant\UpdateMode::SET,
+				"add" => \cooldogedev\BedrockEconomy\database\constant\UpdateMode::ADD,
+				"subtract" => \cooldogedev\BedrockEconomy\database\constant\UpdateMode::SUBTRACT,
+				default => throw new \RuntimeException("Unknown test operation")
+			};
+			if ($this->cancelUnmatchedFirst) {
+				$this->cancelUnmatchedFirst = false;
+				$unmatched = new \cooldogedev\BedrockEconomy\event\transaction\TransactionSubmitEvent(
+					new \cooldogedev\BedrockEconomy\database\transaction\UpdateTransaction($name, $xuid . "-other", $mode, $amount, $decimals)
+				);
+				$unmatched->cancel();
+				$this->cancellationListener->onTransactionSubmit($unmatched);
+			}
+
+			$event = new \cooldogedev\BedrockEconomy\event\transaction\TransactionSubmitEvent(
+				new \cooldogedev\BedrockEconomy\database\transaction\UpdateTransaction($name, $xuid, $mode, $amount, $decimals)
+			);
+			$event->cancel();
+			$this->cancellationListener->onTransactionSubmit($event);
+		}
 
 		public function set(string $xuid, string $name, int $amount, int $decimals, \Closure $onSuccess, \Closure $onError): void {
 			$this->lastOperation = "set";
 			$this->lastAmount = [$amount, $decimals];
 			++$this->calls;
-			$onSuccess();
+			$this->submit("set", $xuid, $name, $amount, $decimals, $onSuccess);
 		}
 
 		public function add(string $xuid, string $name, int $amount, int $decimals, \Closure $onSuccess, \Closure $onError): void {
 			$this->lastOperation = "add";
 			$this->lastAmount = [$amount, $decimals];
 			++$this->calls;
-			$onSuccess();
+			$this->submit("add", $xuid, $name, $amount, $decimals, $onSuccess);
 		}
 
 		public function subtract(string $xuid, string $name, int $amount, int $decimals, \Closure $onSuccess, \Closure $onError): void {
 			$this->lastOperation = "subtract";
 			$this->lastAmount = [$amount, $decimals];
 			++$this->calls;
-			$onSuccess();
+			$this->submit("subtract", $xuid, $name, $amount, $decimals, $onSuccess);
 		}
 	}
 }
 
 namespace {
 	require __DIR__ . "/../src/NhanAZ/EcoAPI/EconomyProvider.php";
+	require __DIR__ . "/../src/NhanAZ/EcoAPI/provider/BedrockEconomyCancellationListener.php";
 	require __DIR__ . "/../src/NhanAZ/EcoAPI/provider/XPProvider.php";
 	require __DIR__ . "/../src/NhanAZ/EcoAPI/provider/BedrockEconomyProvider.php";
 	require __DIR__ . "/../src/NhanAZ/EcoAPI/provider/EconomyAPIProvider.php";
@@ -312,6 +391,9 @@ namespace {
 	$api = new ClosureAPI();
 	$reflection->getProperty("currency")->setValue($bedrock, $currency);
 	$reflection->getProperty("api")->setValue($bedrock, $api);
+	$listener = (new ReflectionClass(\NhanAZ\EcoAPI\provider\BedrockEconomyCancellationListener::class))->newInstanceWithoutConstructor();
+	$reflection->getProperty("cancellationListener")->setValue($bedrock, $listener);
+	$api->cancellationListener = $listener;
 	$balance = null;
 	$bedrock->getMoney($player, static function (float|int $result) use (&$balance): void { $balance = $result; });
 	expect($balance === 1.5, "Default Bedrock balance with 50 cents must be 1.50");
@@ -322,6 +404,17 @@ namespace {
 	expect($success === true && $api->lastAmount === [1, 50], "Bedrock 1.50 must send 50 cents to the API");
 	$bedrock->setMoney($player, 1.10, static function (bool $result) use (&$success): void { $success = $result; });
 	expect($success === true && $api->lastAmount === [1, 10], "Bedrock 1.10 must send ten cents to the API");
+	foreach (["setMoney", "addMoney", "takeMoney"] as $method) {
+		$api->cancelNext = true;
+		$api->cancelUnmatchedFirst = true;
+		$success = null;
+		$callbackCount = 0;
+		$bedrock->{$method}($player, 20.0, static function (bool $result) use (&$success, &$callbackCount): void {
+			$success = $result;
+			++$callbackCount;
+		});
+		expect($success === false && $callbackCount === 1, "Cancelled Bedrock {$method} must report failure once and ignore unrelated events");
+	}
 	foreach ([NAN, INF, -INF, -1.0, 0.001, 1.005, 0.01, 1.05, 3.09, (float) PHP_INT_MAX] as $invalid) {
 		foreach (["setMoney", "addMoney", "takeMoney"] as $method) {
 			$before = $api->calls;
@@ -451,5 +544,5 @@ namespace {
 	}
 	expect(!$unavailableFactoryCalled, "Unavailable provider factory must not run");
 
-	echo "PASS: XP, SimpleEconomy, EconomyAPI and Bedrock amount guards, provider factory, aliases and enabled-state availability\n";
+	echo "PASS: XP, SimpleEconomy, EconomyAPI and Bedrock amount guards, cancelled Bedrock mutation callbacks, provider factory, aliases and enabled-state availability\n";
 }
