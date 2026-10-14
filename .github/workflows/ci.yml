@@ -27,6 +27,14 @@ jobs:
           path: .devtools-dependencies/axolotl-pm
           persist-credentials: false
 
+      - name: Check out Axolotl-PM 5.0.0 API-floor source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: axolotl-pm/PocketMine-MP
+          ref: b16cc69974d4e805d21e6328ab77c0e17cd7116d # Axolotl-PM 5.0.0
+          path: .devtools-dependencies/axolotl-pm-api-floor
+          persist-credentials: false
+
       - name: Check out pinned provider APIs
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -72,6 +80,10 @@ jobs:
           composer validate --strict
           composer install --no-interaction --prefer-dist --no-progress --no-scripts --no-plugins
 
+      - name: Install Axolotl-PM 5.0.0 runtime dependencies
+        run: composer install --no-dev --no-interaction --prefer-dist --no-progress
+        working-directory: .devtools-dependencies/axolotl-pm-api-floor
+
       - name: Analyze EcoAPI and example at PHPStan max
         run: composer phpstan
 
@@ -104,6 +116,13 @@ jobs:
           set -euo pipefail
           php -r '$p=new Phar(getenv("PHAR_PATH")); foreach(["plugin.yml","LICENSE","src/NhanAZ/EcoAPI/EcoAPI.php","src/NhanAZ/EcoAPI/provider/XPProvider.php"] as $f){if(!$p->offsetExists($f)){throw new RuntimeException("Missing PHAR entry: ".$f);}} $m=json_decode(file_get_contents(getenv("BUILD_METADATA")),true,512,JSON_THROW_ON_ERROR); if(hash_file("sha256",getenv("PHAR_PATH"))!==$m["data"]["sha256"]){throw new RuntimeException("PHAR digest mismatch");}'
           cp "$BUILD_METADATA" build/devtools-build.json
+
+      - name: Smoke test plugin startup on Axolotl-PM 5.0.0
+        env:
+          AXOLOTL_SOURCE: .devtools-dependencies/axolotl-pm-api-floor
+          PLUGIN_PHAR: ${{ steps.build.outputs.phar }}
+          PLUGIN_SHA256: ${{ steps.build.outputs.sha256 }}
+        run: python3 tests/api-floor-runtime-smoke.py
 
       - name: Prepare EcoAPI virion for consumer build
         shell: bash
