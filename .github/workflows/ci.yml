@@ -84,7 +84,7 @@ jobs:
 
       - name: Build verified companion plugin PHAR
         id: build
-        uses: NhanAZ/DevTools@6180fb4a04e5981ccb24128823970de3e8fd3830 # v1.0.12
+        uses: NhanAZ/DevTools@8d13a75aaf4f330fdbd93737d58be9cacc41e262 # v1.0.15
         with:
           project: .
           output: build
@@ -115,7 +115,7 @@ jobs:
 
       - name: Build example with shaded EcoAPI
         id: example-build
-        uses: NhanAZ/DevTools@6180fb4a04e5981ccb24128823970de3e8fd3830 # v1.0.12
+        uses: NhanAZ/DevTools@8d13a75aaf4f330fdbd93737d58be9cacc41e262 # v1.0.15
         with:
           project: example
           virions: .devtools-virions
