@@ -70,7 +70,7 @@ jobs:
       - name: Set up Axolotl PHP on Node.js 24
         shell: bash
         env:
-          INPUT_PHP-VERSION: "8.1"
+          INPUT_PHP-VERSION: "8.4"
           INPUT_PM-VERSION-MAJOR: "5"
           INPUT_INSTALL-PATH: ./.php-bin
         run: node "$GITHUB_WORKSPACE/.devtools-dependencies/setup-php-action/dist/index.js"
@@ -96,7 +96,7 @@ jobs:
 
       - name: Build verified companion plugin PHAR
         id: build
-        uses: NhanAZ/DevTools@8d13a75aaf4f330fdbd93737d58be9cacc41e262 # v1.0.15
+        uses: NhanAZ/DevTools@v2 # v2
         with:
           project: .
           output: build
@@ -117,13 +117,6 @@ jobs:
           php -r '$p=new Phar(getenv("PHAR_PATH")); foreach(["plugin.yml","LICENSE","src/NhanAZ/EcoAPI/EcoAPI.php","src/NhanAZ/EcoAPI/provider/XPProvider.php"] as $f){if(!$p->offsetExists($f)){throw new RuntimeException("Missing PHAR entry: ".$f);}} $m=json_decode(file_get_contents(getenv("BUILD_METADATA")),true,512,JSON_THROW_ON_ERROR); if(hash_file("sha256",getenv("PHAR_PATH"))!==$m["data"]["sha256"]){throw new RuntimeException("PHAR digest mismatch");}'
           cp "$BUILD_METADATA" build/devtools-build.json
 
-      - name: Smoke test plugin startup on Axolotl-PM 5.0.0
-        env:
-          AXOLOTL_SOURCE: .devtools-dependencies/axolotl-pm-api-floor
-          PLUGIN_PHAR: ${{ steps.build.outputs.phar }}
-          PLUGIN_SHA256: ${{ steps.build.outputs.sha256 }}
-        run: python3 tests/api-floor-runtime-smoke.py
-
       - name: Prepare EcoAPI virion for consumer build
         shell: bash
         run: |
@@ -134,7 +127,7 @@ jobs:
 
       - name: Build example with shaded EcoAPI
         id: example-build
-        uses: NhanAZ/DevTools@8d13a75aaf4f330fdbd93737d58be9cacc41e262 # v1.0.15
+        uses: NhanAZ/DevTools@v2 # v2
         with:
           project: example
           virions: .devtools-virions
@@ -156,6 +149,21 @@ jobs:
           set -euo pipefail
           test -s "$PHAR_PATH"
           test "$(sha256sum "$PHAR_PATH" | cut -d ' ' -f 1)" = "$PHAR_SHA256"
+
+      - name: Set up PHP 8.3 for the Axolotl-PM 5.0.0 smoke test
+        uses: ./.devtools-dependencies/setup-php-action
+        with:
+          php-version: "8.3"
+          pm-version-major: "5"
+          install-path: ./.php83-bin
+
+      - name: Smoke test plugin startup on Axolotl-PM 5.0.0
+        env:
+          AXOLOTL_SOURCE: .devtools-dependencies/axolotl-pm-api-floor
+          PLUGIN_PHAR: ${{ steps.build.outputs.phar }}
+          PLUGIN_SHA256: ${{ steps.build.outputs.sha256 }}
+          PHP_BIN: php
+        run: python3 tests/api-floor-runtime-smoke.py
 
       - name: Upload verified PHAR
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
