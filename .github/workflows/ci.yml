@@ -96,7 +96,7 @@ jobs:
 
       - name: Build verified companion plugin PHAR
         id: build
-        uses: AxolotlBucketLabs/DevTools@v3 # v3.0.0
+        uses: AxolotlBucketLabs/DevTools@latest # v3.0.0
         with:
           project: .
           output: build
@@ -127,7 +127,7 @@ jobs:
 
       - name: Build example with shaded EcoAPI
         id: example-build
-        uses: AxolotlBucketLabs/DevTools@v3 # v3.0.0
+        uses: AxolotlBucketLabs/DevTools@latest # v3.0.0
         with:
           project: example
           virions: .devtools-virions
